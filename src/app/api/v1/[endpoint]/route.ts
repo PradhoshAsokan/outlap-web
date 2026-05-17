@@ -15,9 +15,9 @@ const OPENF1_MAP: Record<string, string> = {
 
 export async function GET(
   request: Request,
-  { params }: { params: { endpoint: string } }
+  { params }: { params: Promise<{ endpoint: string }> }
 ) {
-  const endpoint = params.endpoint;
+  const { endpoint } = await params;
   const openf1Endpoint = OPENF1_MAP[endpoint];
 
   if (!openf1Endpoint) {

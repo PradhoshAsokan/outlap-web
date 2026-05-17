@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   try {
     const rssResponse = await fetch("https://www.autosport.com/rss/f1/news", {
-      next: { revalidate: 600 } // Cache for 10 minutes
+      next: { revalidate: 900 } // Cache for 15 minutes
     });
     
     if (!rssResponse.ok) {

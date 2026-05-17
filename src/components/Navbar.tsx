@@ -5,7 +5,7 @@ const Navbar = () => {
     <nav className="border-b border-white/5 bg-carbon/80 backdrop-blur-md py-4 px-6 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
         <Link href="/" className="text-xl md:text-2xl font-black tracking-tighter text-f1-red uppercase italic hover:scale-105 transition-transform">
-          Purple Sector
+          Outlap
         </Link>
         
         {/* Desktop Navigation */}

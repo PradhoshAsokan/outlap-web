@@ -72,7 +72,7 @@ export default function PaddockPage() {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-carbon">
-                    <span className="text-f1-red font-black italic opacity-20 text-4xl uppercase tracking-tighter">Purple Sector</span>
+                    <span className="text-f1-red font-black italic opacity-20 text-4xl uppercase tracking-tighter">Outlap</span>
                   </div>
                 )}
                 <div className="absolute top-0 left-0 w-full h-1 bg-f1-red transition-all group-hover:h-2"></div>

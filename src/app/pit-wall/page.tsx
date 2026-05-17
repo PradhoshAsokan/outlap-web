@@ -100,11 +100,11 @@ export default function PitWallPage() {
         return;
       }
       try {
-        const sessionRes = await fetch("https://api.openf1.org/v1/sessions?session_key=latest");
+        const sessionRes = await fetch(`${apiUrl}/v1/sessions`);
         const sessionData = await sessionRes.json();
         
-        if (Array.isArray(sessionData) && sessionData.length > 0) {
-          const latest = sessionData[0];
+        if (sessionData.status === 'Success' && Array.isArray(sessionData.data) && sessionData.data.length > 0) {
+          const latest = sessionData.data[0];
           const now = new Date();
           const isLive = now >= new Date(latest.date_start) && now <= new Date(latest.date_end);
           

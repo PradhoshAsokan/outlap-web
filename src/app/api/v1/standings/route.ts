@@ -1,0 +1,13 @@
+import { NextResponse } from 'next/server';
+
+export async function GET() {
+  try {
+    const response = await fetch("https://api.jolpi.ca/ergast/f1/2026/driverStandings.json", {
+      next: { revalidate: 3600 } // Standings don't change often, cache for 1 hour
+    });
+    const data = await response.json();
+    return NextResponse.json({ source: "Jolpica API (Internal)", status: "Success", data });
+  } catch (error) {
+    return NextResponse.json({ status: "Error", message: "Failed to fetch standings" }, { status: 500 });
+  }
+}

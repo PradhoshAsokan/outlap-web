@@ -13,6 +13,8 @@ const OPENF1_MAP: Record<string, string> = {
   'sessions': 'sessions'
 };
 
+export const runtime = 'edge';
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ endpoint: string }> }

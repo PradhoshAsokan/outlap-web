@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+export const runtime = 'edge';
+
 export async function GET() {
   try {
     const rssResponse = await fetch("https://www.autosport.com/rss/f1/news", {

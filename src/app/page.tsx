@@ -5,7 +5,7 @@ export default function Home() {
     <main className="flex min-h-[calc(100vh-64px)] flex-col items-center justify-center p-8 bg-black text-white">
       <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm flex flex-col gap-12 text-center">
         <h1 className="text-8xl font-bold tracking-tighter text-[#FF1801] uppercase italic">
-          Purple Sector
+          Outlap
         </h1>
         
         <div className="max-w-2xl p-8 border border-[#1F1F1F] bg-[#1F1F1F]/20 rounded-lg backdrop-blur-sm">

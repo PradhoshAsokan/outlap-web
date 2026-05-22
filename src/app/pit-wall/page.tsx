@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import CircuitMap from '@/components/CircuitMap';
 import { CIRCUITS_METADATA } from '@/data/circuits_metadata';
+import OutlapLoader from '@/components/OutlapLoader';
 
 // --- Types ---
 interface RaceMessage {
@@ -60,7 +61,15 @@ interface RadioMessage {
   recording_url: string;
 }
 
-// --- Constants ---
+interface NextSession {
+  raceName: string;
+  date: string;
+  time: string;
+  location: string;
+  daysTo: number;
+}
+
+// --- Constants (Fallback) ---
 const TEAM_COLORS: Record<string, string> = {
   '1': '#FF8000', '3': '#3671C6', '11': '#3671C6', '44': '#E80020', '16': '#E80020',
   '4': '#FF8000', '81': '#FF8000', '63': '#27F4D2', '12': '#27F4D2', '14': '#229971',
@@ -89,6 +98,7 @@ export default function PitWallPage() {
   const [circuitId, setCircuitId] = useState<string>('villeneuve');
   const [sessionName, setSessionName] = useState<string>('Grand Prix');
   const [loading, setLoading] = useState(true);
+  const [nextSession, setNextSession] = useState<NextSession | null>(null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -100,8 +110,13 @@ export default function PitWallPage() {
         return;
       }
       try {
-        const sessionRes = await fetch(`${apiUrl}/v1/sessions`);
+        const [sessionRes, calendarRes] = await Promise.all([
+          fetch(`${apiUrl}/v1/sessions`),
+          fetch(`${apiUrl}/v1/calendar`)
+        ]);
+
         const sessionData = await sessionRes.json();
+        const calendarData = await calendarRes.json();
         
         if (sessionData.status === 'Success' && Array.isArray(sessionData.data) && sessionData.data.length > 0) {
           const latest = sessionData.data[0];
@@ -114,9 +129,25 @@ export default function PitWallPage() {
           if (!isLive) {
             setSessionActive(false);
             fetchSummary(apiUrl);
-            return;
+            
+            // Calculate next session from calendar
+            if (calendarData.status === 'Success') {
+              const races = calendarData.data.MRData.RaceTable.Races;
+              const nextRace = races.find((r: any) => new Date(`${r.date}T${r.time}`) > now);
+              if (nextRace) {
+                const raceDate = new Date(`${nextRace.date}T${nextRace.time}`);
+                setNextSession({
+                  raceName: nextRace.raceName,
+                  date: nextRace.date,
+                  time: nextRace.time,
+                  location: nextRace.Circuit.Location.locality,
+                  daysTo: Math.ceil((raceDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                });
+              }
+            }
+          } else {
+            setSessionActive(true);
           }
-          setSessionActive(true);
         }
       } catch (e) {
         console.log("Session check failed");
@@ -124,10 +155,10 @@ export default function PitWallPage() {
 
       fetchLive(apiUrl);
       interval = setInterval(() => fetchLive(apiUrl), 5000);
+      setLoading(false);
     }
 
     async function fetchSummary(apiUrl: string) {
-       setLoading(true);
        try {
          const response = await fetch(`${apiUrl}/v1/session_results`);
          const data = await response.json();
@@ -140,8 +171,8 @@ export default function PitWallPage() {
            });
            setResults(sorted);
          }
-       } finally {
-         setLoading(false);
+       } catch (e) {
+         console.error("Summary fetch failed");
        }
     }
 
@@ -212,18 +243,26 @@ export default function PitWallPage() {
 
   // --- RENDERING LOGIC ---
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-asphalt">
+        <OutlapLoader />
+      </div>
+    );
+  }
+
   if (!sessionActive) {
      return (
         <div className="p-8 bg-asphalt font-mono text-smoke-white min-h-screen">
            <div className="max-w-6xl mx-auto">
-              <header className="flex justify-between items-end mb-12 border-b border-white/5 pb-8">
+              <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 border-b border-white/5 pb-8 gap-4">
                  <div>
-                    <h1 className="text-6xl font-black text-f1-red uppercase italic tracking-tighter">Session Summary</h1>
-                    <p className="text-xl text-silver/40 uppercase tracking-widest">{sessionName} — {meta.circuit_name}</p>
+                    <h1 className="text-4xl md:text-6xl font-black text-f1-red uppercase italic tracking-tighter">Session Summary</h1>
+                    <p className="text-sm md:text-xl text-silver/40 uppercase tracking-widest">{sessionName} — {meta.circuit_name}</p>
                  </div>
-                 <div className="text-right">
-                    <p className="text-xs text-silver/20 uppercase tracking-[0.3em] mb-1">Status</p>
-                    <span className="px-4 py-1 bg-white/5 border border-white/5 rounded-full text-smoke-white font-bold text-sm uppercase">Off-Track</span>
+                 <div className="md:text-right">
+                    <p className="text-[10px] text-silver/20 uppercase tracking-[0.3em] mb-1">Status</p>
+                    <span className="px-4 py-1 bg-white/5 border border-white/5 rounded-full text-smoke-white font-bold text-xs uppercase">Off-Track</span>
                  </div>
               </header>
 
@@ -232,38 +271,40 @@ export default function PitWallPage() {
                  <div className="lg:col-span-2 space-y-6">
                     <h3 className="text-f1-red font-black italic uppercase tracking-widest text-sm underline decoration-2 underline-offset-8 mb-8">Final Classification</h3>
                     <div className="bg-carbon border border-white/5 rounded-2xl overflow-hidden shadow-2xl">
-                       <table className="w-full text-left">
-                          <thead className="bg-steel/50 text-silver/60 text-[10px] uppercase font-bold tracking-widest">
-                             <tr><th className="p-4">Pos</th><th className="p-4">Driver</th><th className="p-4">Status</th><th className="p-4 text-right">Points</th></tr>
-                          </thead>
-                          <tbody>
-                             {results.map((r) => (
-                                <tr key={r.driver_number} className="border-t border-white/5 hover:bg-white/[0.02] transition-colors">
-                                   <td className="p-4 text-2xl font-black italic text-silver/20">{r.position}</td>
-                                   <td className="p-4">
-                                      <div className="flex items-center gap-4">
-                                         <div className="w-1 h-8 rounded-full shadow-glow" style={{ backgroundColor: TEAM_COLORS[r.driver_number] }}></div>
-                                         <div>
-                                            <p className="text-xl font-black uppercase italic leading-none text-smoke-white tracking-tighter">
-                                               {DRIVER_CODES[r.driver_number] || 'DVR'}
-                                            </p>
-                                            <p className="text-[10px] text-silver/40 font-bold mt-1 tracking-widest">
-                                               #{r.driver_number}
-                                            </p>
+                       <div className="overflow-x-auto">
+                          <table className="w-full text-left">
+                             <thead className="bg-steel/50 text-silver/60 text-[10px] uppercase font-bold tracking-widest">
+                                <tr><th className="p-4">Pos</th><th className="p-4">Driver</th><th className="p-4">Status</th><th className="p-4 text-right">Points</th></tr>
+                             </thead>
+                             <tbody>
+                                {results.map((r) => (
+                                   <tr key={r.driver_number} className="border-t border-white/5 hover:bg-white/[0.02] transition-colors">
+                                      <td className="p-4 text-xl md:text-2xl font-black italic text-silver/20">{r.position}</td>
+                                      <td className="p-4">
+                                         <div className="flex items-center gap-4">
+                                            <div className="w-1 h-8 rounded-full shadow-glow" style={{ backgroundColor: TEAM_COLORS[r.driver_number] }}></div>
+                                            <div>
+                                               <p className="text-lg md:text-xl font-black uppercase italic leading-none text-smoke-white tracking-tighter">
+                                                  {DRIVER_CODES[r.driver_number] || 'DVR'}
+                                               </p>
+                                               <p className="text-[10px] text-silver/40 font-bold mt-1 tracking-widest">
+                                                  #{r.driver_number}
+                                               </p>
+                                            </div>
                                          </div>
-                                      </div>
-                                   </td>
-                                   <td className="p-4 text-xs font-bold uppercase">
-                                      {r.dsq ? <span className="text-f1-red">DSQ</span> : 
-                                       r.dnf ? <span className="text-silver/40">DNF</span> : 
-                                       r.dns ? <span className="text-silver/20">DNS</span> : 
-                                       <span className="text-green-500/60 text-[8px]">Finished</span>}
-                                   </td>
-                                   <td className="p-4 text-right text-2xl font-black text-f1-red tabular-nums">{r.points}</td>
-                                </tr>
-                             ))}
-                          </tbody>
-                       </table>
+                                      </td>
+                                      <td className="p-4 text-[10px] font-bold uppercase">
+                                         {r.dsq ? <span className="text-f1-red">DSQ</span> : 
+                                          r.dnf ? <span className="text-silver/40">DNF</span> : 
+                                          r.dns ? <span className="text-silver/20">DNS</span> : 
+                                          <span className="text-green-500/60 text-[8px]">Finished</span>}
+                                      </td>
+                                      <td className="p-4 text-right text-xl md:text-2xl font-black text-f1-red tabular-nums">{r.points}</td>
+                                   </tr>
+                                ))}
+                             </tbody>
+                          </table>
+                       </div>
                     </div>
                  </div>
 
@@ -276,16 +317,18 @@ export default function PitWallPage() {
                        </div>
                        <div className="grid grid-cols-2 gap-4">
                           <CircuitStat label="Laps" value={meta.number_of_laps.toString()} />
-                          <CircuitStat label="Distance" value={meta.track_length_km * meta.number_of_laps + " km"} />
+                          <CircuitStat label="Distance" value={(meta.track_length_km * meta.number_of_laps).toFixed(1) + " km"} />
                        </div>
                     </div>
 
-                    <div className="bg-f1-red rounded-2xl p-8 shadow-[0_0_50px_rgba(255,24,1,0.2)]">
-                       <h4 className="text-[10px] font-black text-black uppercase tracking-widest mb-4">Next Event</h4>
-                       <p className="text-3xl font-black text-black italic uppercase leading-none mb-2">CANADIAN GP</p>
-                       <p className="text-black/60 text-xs font-bold uppercase tracking-widest mb-8">Montreal — May 24</p>
-                       <div className="text-4xl font-black text-smoke-white tracking-tighter italic">LIVE IN 12 DAYS</div>
-                    </div>
+                    {nextSession && (
+                      <div className="bg-f1-red rounded-2xl p-8 shadow-[0_0_50px_rgba(255,24,1,0.2)]">
+                         <h4 className="text-[10px] font-black text-black uppercase tracking-widest mb-4">Next Event</h4>
+                         <p className="text-3xl font-black text-black italic uppercase leading-none mb-2">{nextSession.raceName}</p>
+                         <p className="text-black/60 text-xs font-bold uppercase tracking-widest mb-8">{nextSession.location} — {new Date(nextSession.date).toLocaleDateString([], { month: 'long', day: 'numeric' })}</p>
+                         <div className="text-4xl font-black text-smoke-white tracking-tighter italic">LIVE IN {nextSession.daysTo} DAYS</div>
+                      </div>
+                    )}
                  </div>
               </div>
            </div>
@@ -297,8 +340,8 @@ export default function PitWallPage() {
     <div className="p-4 bg-asphalt font-mono text-smoke-white min-h-screen overflow-x-hidden">
       
       {/* LAYER 1: LIVE CONTROL */}
-      <div className="h-[calc(100vh-120px)] flex flex-col mb-8">
-        <div className="flex justify-between items-center mb-4 px-2">
+      <div className="lg:h-[calc(100vh-120px)] flex flex-col mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 px-2 gap-4">
           <div className="flex items-center gap-4">
             <h1 className="text-2xl font-black text-f1-red uppercase italic tracking-tighter text-glow">The Pit Wall</h1>
             <div className="h-4 w-[1px] bg-white/20"></div>
@@ -317,7 +360,7 @@ export default function PitWallPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0">
           {/* Leaderboard */}
-          <div className="lg:col-span-3 h-full flex flex-col bg-carbon border border-white/5 rounded-lg overflow-hidden shadow-2xl">
+          <div className="lg:col-span-3 h-[400px] lg:h-full flex flex-col bg-carbon border border-white/5 rounded-lg overflow-hidden shadow-2xl">
             <div className="bg-steel px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-f1-red">Timing / Gaps</div>
             <div className="flex-1 overflow-y-auto scrollbar-hide">
               <table className="w-full text-left text-[10px]">
@@ -342,16 +385,16 @@ export default function PitWallPage() {
           </div>
 
           {/* Circuit Monitor */}
-          <div className="lg:col-span-6 h-full border border-white/5 bg-carbon/40 rounded-lg flex flex-col items-center justify-center relative overflow-hidden group shadow-inner">
+          <div className="lg:col-span-6 h-[400px] lg:h-full border border-white/5 bg-carbon/40 rounded-lg flex flex-col items-center justify-center relative overflow-hidden group shadow-inner">
              <div className="absolute top-3 left-4 text-[8px] font-black text-f1-red/40 uppercase tracking-widest z-10">Circuit Monitor</div>
-             <div className="absolute top-12 left-4 flex flex-col gap-2 z-10"><CircuitStat label="Track Length" value={meta.track_length_km + " km"} /><CircuitStat label="Total Laps" value={meta.number_of_laps.toString()} /><CircuitStat label="First GP" value={meta.first_grand_prix.toString()} /></div>
-             <div className="absolute top-12 right-4 flex flex-col items-end gap-2 z-10 text-right"><CircuitStat label="Fastest Lap" value={meta.fastest_lap.time} /><CircuitStat label="Held By" value={meta.fastest_lap.driver} /><CircuitStat label="Year" value={meta.fastest_lap.year.toString()} /></div>
+             <div className="absolute top-12 left-4 flex flex-col gap-2 z-10 hidden md:flex"><CircuitStat label="Track Length" value={meta.track_length_km + " km"} /><CircuitStat label="Total Laps" value={meta.number_of_laps.toString()} /><CircuitStat label="First GP" value={meta.first_grand_prix.toString()} /></div>
+             <div className="absolute top-12 right-4 flex flex-col items-end gap-2 z-10 text-right hidden md:flex"><CircuitStat label="Fastest Lap" value={meta.fastest_lap.time} /><CircuitStat label="Held By" value={meta.fastest_lap.driver} /><CircuitStat label="Year" value={meta.fastest_lap.year.toString()} /></div>
              <CircuitMap circuitId={circuitId} className="w-[80%] h-[80%]" showCars={true} />
              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center z-10 w-full px-4"><h2 className="text-xl font-black italic uppercase text-smoke-white tracking-tighter drop-shadow-lg">{meta.circuit_name}</h2><p className="text-[8px] text-silver/40 uppercase tracking-[0.4em] font-bold">{meta.location}</p></div>
           </div>
 
           {/* Race Control */}
-          <div className="lg:col-span-3 h-full flex flex-col bg-carbon border border-white/5 rounded-lg overflow-hidden shadow-2xl">
+          <div className="lg:col-span-3 h-[400px] lg:h-full flex flex-col bg-carbon border border-white/5 rounded-lg overflow-hidden shadow-2xl">
             <div className="bg-steel px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-f1-red">Race Control</div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2 text-[10px] scrollbar-thin scrollbar-thumb-white/10">
               {messages.map((m, i) => (
@@ -388,7 +431,7 @@ export default function PitWallPage() {
 
       {/* LAYER 3: TELEMETRY */}
       <div className="border border-white/5 bg-carbon border border-white/5 rounded-xl p-6 shadow-2xl mb-20">
-        <div className="flex justify-between items-center mb-6 px-2"><div className="flex items-center gap-3"><h3 className="text-f1-red font-black italic uppercase text-sm tracking-widest">Telemetry grid</h3><div className="px-2 py-0.5 bg-green-500/20 text-green-500 text-[8px] font-bold rounded animate-pulse uppercase">Link_Active</div></div><span className="text-[8px] text-silver/20 uppercase font-mono tracking-widest">Global Hz: 2.7</span></div>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 px-2 gap-4"><div className="flex items-center gap-3"><h3 className="text-f1-red font-black italic uppercase text-sm tracking-widest">Telemetry grid</h3><div className="px-2 py-0.5 bg-green-500/20 text-green-500 text-[8px] font-bold rounded animate-pulse uppercase">Link_Active</div></div><span className="text-[8px] text-silver/20 uppercase font-mono tracking-widest">Global Hz: 2.7</span></div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">{Object.keys(DRIVER_CODES).map((num) => { const dNum = parseInt(num); const data = telemetry[dNum]; return (<div key={num} className="bg-asphalt/40 border border-white/5 p-3 rounded-lg hover:border-f1-red/50 transition-all group"><div className="flex justify-between items-center mb-3"><span className="text-base font-black italic text-silver/40 group-hover:text-smoke-white transition-colors">{DRIVER_CODES[num]}</span><div className="w-1 h-3 rounded-full shadow-lg" style={{ backgroundColor: TEAM_COLORS[num] }}></div></div><div className="space-y-2"><TelemetryStat label="SPD" value={data?.speed.toString() || '---'} unit="KM/H" /><TelemetryStat label="RPM" value={data?.rpm.toString() || '----'} /><TelemetryStat label="GR" value={data?.n_gear.toString() || '-'} /><div className="h-1 w-full bg-white/5 rounded-full mt-2 overflow-hidden shadow-inner"><div className="h-full bg-f1-red/60 transition-all duration-700" style={{ width: `${(data?.throttle || 0)}%` }}></div></div></div></div>); })}</div>
       </div>
     </div>

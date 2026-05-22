@@ -1,12 +1,12 @@
-import { NextResponse } from 'next/server';
-
 export const runtime = 'edge';
 
 export async function GET() {
-  return NextResponse.json({ 
+  return new Response(JSON.stringify({ 
     status: "Success", 
-    message: "Outlap API is reachable",
-    timestamp: new Date().toISOString(),
-    runtime: "Edge"
+    message: "Minimal Outlap API is reachable",
+    timestamp: new Date().toISOString()
+  }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' }
   });
 }

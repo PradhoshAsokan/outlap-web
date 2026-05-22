@@ -1,44 +1,59 @@
-import { NextResponse } from 'next/server';
-
 export const runtime = 'edge';
 
 export async function GET() {
   try {
-    console.log("Diagnostic: News fetch starting");
     const rssResponse = await fetch("https://www.autosport.com/rss/f1/news", {
       headers: {
-        'User-Agent': 'Outlap/1.0 (Next.js Edge Runtime)'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     });
     
     if (!rssResponse.ok) {
-      return NextResponse.json({ 
+      return new Response(JSON.stringify({ 
         status: "Error", 
-        message: `Fetch failed: ${rssResponse.status}`,
-        debug: "Fetch was not OK"
-      }, { status: 500 });
+        message: `Fetch failed with status ${rssResponse.status}` 
+      }), {
+        status: rssResponse.status,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     const xmlText = await rssResponse.text();
-    console.log("Diagnostic: XML received, length:", xmlText.length);
+    const items = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    let match;
 
-    // Simple return for testing connectivity first
-    return NextResponse.json({ 
+    while ((match = itemRegex.exec(xmlText)) !== null) {
+      const itemContent = match[1];
+      const title = itemContent.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/)?.[1] || 
+                    itemContent.match(/<title>([\s\S]*?)<\/title>/)?.[1];
+      const link = itemContent.match(/<link>([\s\S]*?)<\/link>/)?.[1];
+      const pubDate = itemContent.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1];
+      const imageUrl = itemContent.match(/<enclosure url="([\s\S]*?)"/)?.[1];
+      const isF1 = title?.match(/F1|Formula 1|Verstappen|Hamilton|Leclerc|Norris|Grand Prix|GP/i);
+      
+      if (title && link && isF1) {
+        items.push({
+          title: title.trim(),
+          link: link.trim(),
+          date: pubDate ? new Date(pubDate).toLocaleDateString() : 'Recent',
+          image: imageUrl || null
+        });
+      }
+    }
+
+    return new Response(JSON.stringify({ 
+      source: "Autosport F1 RSS (Stability Patch)", 
       status: "Success", 
-      message: "Connectivity test successful",
-      xmlLength: xmlText.length,
-      preview: xmlText.substring(0, 100)
+      data: items.slice(0, 12) 
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
     });
-
   } catch (error: any) {
-    console.error("Diagnostic: Crash detected:", error);
-    return new Response(JSON.stringify({
-      status: "Error",
-      message: "CATCH_BLOCK_TRIGGERED",
-      errorName: error.name,
-      errorMessage: error.message,
-      errorStack: error.stack,
-      hint: "Check if fetch or processing failed"
+    return new Response(JSON.stringify({ 
+      status: "Error", 
+      message: error.message || "Internal Server Error during fetch" 
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

@@ -88,6 +88,7 @@ export default function StandingsPage() {
   return (
     <div className="p-8 min-h-screen bg-asphalt flex flex-col items-center">
       <div className="w-full max-w-5xl">
+
         <h1 className="text-4xl font-black text-f1-red uppercase italic mb-8 tracking-tighter text-center lg:text-left">Hall of Fame</h1>
         
         <div className="flex justify-center lg:justify-start gap-4 mb-8">

@@ -17,7 +17,6 @@ export default function RootLayout({
     <html lang="en" className="h-full bg-asphalt">
       <body className="min-h-full flex flex-col antialiased">
         <Navbar />
-        <PathTracker />
         <main className="flex-grow">
           {children}
         </main>

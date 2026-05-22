@@ -63,7 +63,15 @@ export default function StandingsPage() {
         
         console.log(`Fetching ${view} from:`, `${apiUrl}${endpoint}`);
         const response = await fetch(`${apiUrl}${endpoint}`);
-        const result = await response.json();
+        
+        let result;
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          result = await response.json();
+        } else {
+          const text = await response.text();
+          throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 100)}`);
+        }
         
         if (response.ok && result.status === 'Success') {
           const standingsList = result.data.MRData.StandingsTable.StandingsLists[0];

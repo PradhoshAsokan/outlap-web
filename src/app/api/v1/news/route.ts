@@ -4,13 +4,13 @@ export const runtime = 'edge';
 
 export async function GET() {
   try {
+    // Remove 'next: { revalidate }' to test if it's causing the crash
     const rssResponse = await fetch("https://www.autosport.com/rss/f1/news", {
       headers: {
         'User-Agent': 'Outlap/1.0 (Next.js Edge Runtime)'
-      },
-      next: { revalidate: 300 }
+      }
     });
-
+    
     if (!rssResponse.ok) {
       return NextResponse.json(
         { status: "Error", message: `External RSS source returned ${rssResponse.status}` },
@@ -43,14 +43,13 @@ export async function GET() {
     }
 
     return NextResponse.json({ 
-      source: "Autosport F1 RSS (Internal)", 
+      source: "Autosport F1 RSS (Internal - No Cache)", 
       status: "Success", 
       data: items.slice(0, 12) 
     });
-  } catch (error) {
-    console.error("News API Error:", error);
+  } catch (error: any) {
     return NextResponse.json(
-      { status: "Error", message: "Failed to fetch news" },
+      { status: "Error", message: error.message || "Failed to fetch news" },
       { status: 500 }
     );
   }

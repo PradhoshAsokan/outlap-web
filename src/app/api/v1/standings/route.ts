@@ -7,8 +7,7 @@ export async function GET() {
     const response = await fetch("https://api.jolpi.ca/ergast/f1/2026/driverStandings.json", {
       headers: {
         'User-Agent': 'Outlap/1.0 (Next.js Edge Runtime)'
-      },
-      next: { revalidate: 3600 }
+      }
     });
     
     if (!response.ok) {

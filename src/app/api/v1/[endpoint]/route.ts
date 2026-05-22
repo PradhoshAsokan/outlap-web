@@ -30,8 +30,7 @@ export async function GET(
     const response = await fetch(`https://api.openf1.org/v1/${openf1Endpoint}?session_key=latest`, {
       headers: {
         'User-Agent': 'Outlap/1.0 (Next.js Edge Runtime)'
-      },
-      next: { revalidate: 2 }
+      }
     });
 
     if (!response.ok) {

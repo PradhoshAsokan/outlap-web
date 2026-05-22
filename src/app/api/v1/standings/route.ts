@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
@@ -13,7 +14,7 @@ export async function GET() {
         message: `Jolpica returned ${response.status}` 
       }), {
         status: response.status,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
       });
     }
 
@@ -24,7 +25,7 @@ export async function GET() {
       data 
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   } catch (error: any) {
     return new Response(JSON.stringify({ 
@@ -32,7 +33,17 @@ export async function GET() {
       message: error.message || "Failed to fetch standings" 
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    },
+  });
 }

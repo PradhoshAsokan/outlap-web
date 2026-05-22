@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
@@ -10,19 +11,29 @@ export async function GET() {
     if (!response.ok) {
       return new Response(JSON.stringify({ status: "Error", message: `Jolpica returned ${response.status}` }), {
         status: response.status,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
       });
     }
 
     const data = await response.json();
     return new Response(JSON.stringify({ source: "Outlap API (Internal)", status: "Success", data }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   } catch (error: any) {
     return new Response(JSON.stringify({ status: "Error", message: error.message || "Failed to fetch constructors" }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    },
+  });
 }

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: Request,
@@ -22,7 +23,7 @@ export async function GET(
   if (!openf1Endpoint) {
     return new Response(JSON.stringify({ status: "Error", message: "Invalid endpoint" }), {
       status: 404,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   }
 
@@ -36,7 +37,7 @@ export async function GET(
     if (!response.ok) {
       return new Response(JSON.stringify({ status: "Error", message: `OpenF1 returned ${response.status}` }), {
         status: response.status,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
       });
     }
     
@@ -48,12 +49,22 @@ export async function GET(
 
     return new Response(JSON.stringify({ source: "Outlap API (Internal)", status: "Success", data }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   } catch (error: any) {
     return new Response(JSON.stringify({ status: "Error", message: error.message || `Failed to fetch ${endpoint}` }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    },
+  });
 }

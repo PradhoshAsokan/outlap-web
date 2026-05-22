@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const rssResponse = await fetch("https://www.autosport.com/rss/f1/news", {
@@ -12,7 +14,7 @@ export async function GET() {
         message: `External fetch failed: ${rssResponse.status}` 
       }), {
         status: rssResponse.status,
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
       });
     }
 
@@ -46,7 +48,7 @@ export async function GET() {
       data: items.slice(0, 12) 
     }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   } catch (error: any) {
     return new Response(JSON.stringify({ 
@@ -54,7 +56,18 @@ export async function GET() {
       message: error.message || "Internal Server Error" 
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   }
+}
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
 }

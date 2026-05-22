@@ -85,8 +85,9 @@ export default function StandingsPage() {
   }, [view]);
 
   return (
-    <div className="p-8 min-h-screen bg-asphalt">
-      <h1 className="text-4xl font-black text-f1-red uppercase italic mb-8 tracking-tighter">Hall of Fame</h1>
+    <div className="p-8 min-h-screen bg-asphalt flex flex-col items-center">
+      <div className="w-full max-w-5xl">
+        <h1 className="text-4xl font-black text-f1-red uppercase italic mb-8 tracking-tighter">Hall of Fame</h1>
       
       <div className="flex gap-4 mb-8">
         <button 

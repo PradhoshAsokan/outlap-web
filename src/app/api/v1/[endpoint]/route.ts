@@ -28,8 +28,19 @@ export async function GET(
 
   try {
     const response = await fetch(`https://api.openf1.org/v1/${openf1Endpoint}?session_key=latest`, {
-      next: { revalidate: 2 } // Very short cache for "live" data
+      headers: {
+        'User-Agent': 'Outlap/1.0 (Next.js Edge Runtime)'
+      },
+      next: { revalidate: 2 }
     });
+
+    if (!response.ok) {
+      return NextResponse.json(
+        { status: "Error", message: `OpenF1 returned ${response.status} for ${endpoint}` },
+        { status: response.status }
+      );
+    }
+    
     let data = await response.json();
 
     if (endpoint === 'car_data' && Array.isArray(data)) {
@@ -37,7 +48,7 @@ export async function GET(
     }
 
     return NextResponse.json({ source: "OpenF1 API (Internal)", status: "Success", data });
-  } catch (error) {
-    return NextResponse.json({ status: "Error", message: `Failed to fetch ${endpoint}` }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ status: "Error", message: error.message || `Failed to fetch ${endpoint}` }, { status: 500 });
   }
 }

@@ -65,7 +65,7 @@ export default function StandingsPage() {
         const response = await fetch(`${apiUrl}${endpoint}`);
         const result = await response.json();
         
-        if (result.status === 'Success') {
+        if (response.ok && result.status === 'Success') {
           const standingsList = result.data.MRData.StandingsTable.StandingsLists[0];
           if (view === 'drivers') {
             setDriverStandings(standingsList.DriverStandings);
@@ -73,10 +73,10 @@ export default function StandingsPage() {
             setConstructorStandings(standingsList.ConstructorStandings);
           }
         } else {
-          setError(`Failed to fetch ${view} data`);
+          setError(result.message || `Failed to fetch ${view} data (${response.status})`);
         }
-      } catch (err) {
-        setError('Connection to backend failed');
+      } catch (err: any) {
+        setError(err.message || 'Connection to backend failed');
       } finally {
         setLoading(false);
       }

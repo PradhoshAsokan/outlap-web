@@ -5,11 +5,17 @@ export const runtime = 'edge';
 export async function GET() {
   try {
     const rssResponse = await fetch("https://www.autosport.com/rss/f1/news", {
-      next: { revalidate: 900 } // Cache for 15 minutes
+      headers: {
+        'User-Agent': 'Outlap/1.0 (Next.js Edge Runtime)'
+      },
+      next: { revalidate: 300 }
     });
-    
+
     if (!rssResponse.ok) {
-      throw new Error(`Failed to fetch RSS feed: ${rssResponse.statusText}`);
+      return NextResponse.json(
+        { status: "Error", message: `External RSS source returned ${rssResponse.status}` },
+        { status: rssResponse.status }
+      );
     }
 
     const xmlText = await rssResponse.text();

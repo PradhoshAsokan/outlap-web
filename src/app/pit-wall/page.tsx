@@ -62,11 +62,14 @@ interface RadioMessage {
 }
 
 interface NextSession {
-  raceName: string;
+  label: string;
   date: string;
   time: string;
   location: string;
-  daysTo: number;
+  days: number;
+  hours: string;
+  minutes: string;
+  seconds: string;
 }
 
 // --- Constants (Fallback) ---
@@ -102,6 +105,7 @@ export default function PitWallPage() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
+    let countdownInterval: NodeJS.Timeout;
 
     async function checkSessionAndFetch() {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -133,21 +137,60 @@ export default function PitWallPage() {
             // Calculate next session from calendar
             if (calendarData.status === 'Success') {
               const races = calendarData.data.MRData.RaceTable.Races;
-              const nextRace = races.find((r: any) => new Date(`${r.date}T${r.time}`) > now);
-              if (nextRace) {
-                const raceDate = new Date(`${nextRace.date}T${nextRace.time}`);
-                setNextSession({
-                  raceName: nextRace.raceName,
-                  date: nextRace.date,
-                  time: nextRace.time,
-                  location: nextRace.Circuit.Location.locality,
-                  daysTo: Math.ceil((raceDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-                });
-              }
+              
+              const updateTickingCountdown = () => {
+                const currentTime = new Date();
+                let closest: { time: Date, label: string, race: any } | null = null;
+
+                for (const race of races) {
+                  const sessions = [
+                    { date: race.date, time: race.time, label: 'Main Race' },
+                    { date: race.Qualifying?.date, time: race.Qualifying?.time, label: 'Qualifying' },
+                    { date: race.FirstPractice?.date, time: race.FirstPractice?.time, label: 'FP1' },
+                    { date: race.SecondPractice?.date, time: race.SecondPractice?.time, label: 'FP2' },
+                    { date: race.ThirdPractice?.date, time: race.ThirdPractice?.time, label: 'FP3' },
+                    { date: race.Sprint?.date, time: race.Sprint?.time, label: 'Sprint Race' },
+                    { date: race.SprintQualifying?.date, time: race.SprintQualifying?.time, label: 'Sprint Quali' },
+                  ];
+
+                  for (const s of sessions) {
+                    if (!s.date || !s.time) continue;
+                    const sTime = new Date(`${s.date}T${s.time}`);
+                    if (sTime > currentTime) {
+                      if (!closest || sTime < closest.time) {
+                        closest = { time: sTime, label: s.label, race };
+                      }
+                    }
+                  }
+                }
+
+                if (closest) {
+                  const diff = closest.time.getTime() - currentTime.getTime();
+                  const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+                  const h = Math.floor((diff / (1000 * 60 * 60)) % 24);
+                  const m = Math.floor((diff / 1000 / 60) % 60);
+                  const s = Math.floor((diff / 1000) % 60);
+
+                  setNextSession({
+                    label: `${closest.race.raceName} - ${closest.label}`,
+                    date: closest.race.date,
+                    time: closest.race.time,
+                    location: closest.race.Circuit.Location.locality,
+                    days: d,
+                    hours: h.toString().padStart(2, '0'),
+                    minutes: m.toString().padStart(2, '0'),
+                    seconds: s.toString().padStart(2, '0')
+                  });
+                }
+              };
+
+              updateTickingCountdown();
+              countdownInterval = setInterval(updateTickingCountdown, 1000);
             }
-          } else {
-            setSessionActive(true);
+            setLoading(false);
+            return;
           }
+          setSessionActive(true);
         }
       } catch (e) {
         console.log("Session check failed");
@@ -230,7 +273,10 @@ export default function PitWallPage() {
     }
 
     checkSessionAndFetch();
-    return () => { if (interval) clearInterval(interval); };
+    return () => { 
+      if (interval) clearInterval(interval); 
+      if (countdownInterval) clearInterval(countdownInterval);
+    };
   }, []);
 
   const meta = CIRCUITS_METADATA[circuitId] || CIRCUITS_METADATA['villeneuve'];
@@ -324,9 +370,11 @@ export default function PitWallPage() {
                     {nextSession && (
                       <div className="bg-f1-red rounded-2xl p-8 shadow-[0_0_50px_rgba(255,24,1,0.2)]">
                          <h4 className="text-[10px] font-black text-black uppercase tracking-widest mb-4">Next Event</h4>
-                         <p className="text-3xl font-black text-black italic uppercase leading-none mb-2">{nextSession.raceName}</p>
-                         <p className="text-black/60 text-xs font-bold uppercase tracking-widest mb-8">{nextSession.location} — {new Date(nextSession.date).toLocaleDateString([], { month: 'long', day: 'numeric' })}</p>
-                         <div className="text-4xl font-black text-smoke-white tracking-tighter italic">LIVE IN {nextSession.daysTo} DAYS</div>
+                         <p className="text-xl font-black text-black italic uppercase leading-none mb-2">{nextSession.label}</p>
+                         <p className="text-black/60 text-[10px] font-bold uppercase tracking-widest mb-8">{nextSession.location} — {new Date(nextSession.date).toLocaleDateString([], { month: 'long', day: 'numeric' })}</p>
+                         <div className="text-3xl font-black text-smoke-white tracking-tighter italic tabular-nums">
+                            {nextSession.days}D : {nextSession.hours}H : {nextSession.minutes}M : {nextSession.seconds}S
+                         </div>
                       </div>
                     )}
                  </div>

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
-import PathTracker from "@/components/PathTracker";
 
 export const metadata: Metadata = {
   title: "Outlap | F1 data hub",

@@ -61,17 +61,8 @@ export default function StandingsPage() {
         }
         const endpoint = view === 'drivers' ? '/v1/standings' : '/v1/constructors';
         
-        console.log(`Fetching ${view} from:`, `${apiUrl}${endpoint}`);
         const response = await fetch(`${apiUrl}${endpoint}`);
-        
-        let result;
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          result = await response.json();
-        } else {
-          const text = await response.text();
-          throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 100)}`);
-        }
+        const result = await response.json();
         
         if (response.ok && result.status === 'Success') {
           const standingsList = result.data.MRData.StandingsTable.StandingsLists[0];

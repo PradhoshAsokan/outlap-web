@@ -1,55 +1,59 @@
 export async function GET() {
-  const result: any = {
-    step: "INIT",
-    error: null
-  };
-
   try {
-    result.step = "FETCH_START";
     const rssResponse = await fetch("https://www.autosport.com/rss/f1/news", {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'application/xml, text/xml, */*'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       }
     });
     
-    result.step = "FETCH_COMPLETE";
-    result.status = rssResponse.status;
-    result.ok = rssResponse.ok;
-
     if (!rssResponse.ok) {
       return new Response(JSON.stringify({ 
         status: "Error", 
-        message: `External fetch returned ${rssResponse.status}`,
-        debug: result 
+        message: `External fetch failed: ${rssResponse.status}` 
       }), {
-        status: 200, // Return 200 so we can see the JSON debug info
+        status: rssResponse.status,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    result.step = "READING_TEXT";
     const xmlText = await rssResponse.text();
-    
+    const items = [];
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    let match;
+
+    while ((match = itemRegex.exec(xmlText)) !== null) {
+      const itemContent = match[1];
+      const title = itemContent.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/)?.[1] || 
+                    itemContent.match(/<title>([\s\S]*?)<\/title>/)?.[1];
+      const link = itemContent.match(/<link>([\s\S]*?)<\/link>/)?.[1];
+      const pubDate = itemContent.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1];
+      const imageUrl = itemContent.match(/<enclosure url="([\s\S]*?)"/)?.[1];
+      const isF1 = title?.match(/F1|Formula 1|Verstappen|Hamilton|Leclerc|Norris|Grand Prix|GP/i);
+      
+      if (title && link && isF1) {
+        items.push({
+          title: title.trim(),
+          link: link.trim(),
+          date: pubDate ? new Date(pubDate).toLocaleDateString() : 'Recent',
+          image: imageUrl || null
+        });
+      }
+    }
+
     return new Response(JSON.stringify({ 
+      source: "Autosport F1 RSS (Consolidated)", 
       status: "Success", 
-      message: "Connectivity test successful",
-      xmlLength: xmlText.length,
-      debug: result
+      data: items.slice(0, 12) 
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
-
   } catch (error: any) {
     return new Response(JSON.stringify({ 
       status: "Error", 
-      step: result.step,
-      message: error.message || "Unknown error",
-      stack: error.stack,
-      type: error.constructor.name
+      message: error.message || "Internal Server Error" 
     }), {
-      status: 200, // Return 200 to bypass Cloudflare 500 page
+      status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
   }

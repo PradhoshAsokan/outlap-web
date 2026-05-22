@@ -46,7 +46,7 @@ export async function GET(
       data = data.slice(-50);
     }
 
-    return new Response(JSON.stringify({ source: "OpenF1 API (Stability Patch)", status: "Success", data }), {
+    return new Response(JSON.stringify({ source: "Outlap API (Internal)", status: "Success", data }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

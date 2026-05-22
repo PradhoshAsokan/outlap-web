@@ -19,7 +19,7 @@ export async function GET() {
 
     const data = await response.json();
     return new Response(JSON.stringify({ 
-      source: "Jolpica API (Stability Patch)", 
+      source: "Outlap API (Internal)", 
       status: "Success", 
       data 
     }), {

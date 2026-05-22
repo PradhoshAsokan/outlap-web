@@ -15,7 +15,7 @@ export async function GET() {
     }
 
     const data = await response.json();
-    return new Response(JSON.stringify({ source: "Jolpica API (Stability Patch)", status: "Success", data }), {
+    return new Response(JSON.stringify({ source: "Outlap API (Internal)", status: "Success", data }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

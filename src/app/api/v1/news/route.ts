@@ -41,7 +41,7 @@ export async function GET() {
     }
 
     return new Response(JSON.stringify({ 
-      source: "Autosport F1 RSS (Consolidated)", 
+      source: "Outlap API (Internal)", 
       status: "Success", 
       data: items.slice(0, 12) 
     }), {

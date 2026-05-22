@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import CircuitMap from '@/components/CircuitMap';
 import { CIRCUITS_METADATA } from '@/data/circuits_metadata';
 import OutlapLoader from '@/components/OutlapLoader';
+import { usePitwallWebSocket, TelemetryData } from '@/hooks/usePitwallWebSocket';
 
 // --- Types ---
 interface RaceMessage {
@@ -89,12 +90,14 @@ const DRIVER_CODES: Record<string, string> = {
 };
 
 export default function PitWallPage() {
+  const { data: wsTelemetry, isConnected: wsConnected, lastHz } = usePitwallWebSocket();
+  
   const [messages, setMessages] = useState<RaceMessage[]>([]);
   const [weather, setWeather] = useState<Weather | null>(null);
   const [radio, setRadio] = useState<RadioMessage[]>([]);
   const [stints, setStints] = useState<Stint[]>([]);
   const [pits, setPits] = useState<PitStop[]>([]);
-  const [telemetry, setTelemetry] = useState<Record<number, CarTelemetry>>({});
+  const [restTelemetry, setRestTelemetry] = useState<Record<number, CarTelemetry>>({});
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [results, setResults] = useState<SessionResult[]>([]);
   const [sessionActive, setSessionActive] = useState(true);
@@ -102,6 +105,22 @@ export default function PitWallPage() {
   const [sessionName, setSessionName] = useState<string>('Grand Prix');
   const [loading, setLoading] = useState(true);
   const [nextSession, setNextSession] = useState<NextSession | null>(null);
+
+  // Derived telemetry: prioritize WS over REST polling
+  const telemetry: Record<number, CarTelemetry> = wsConnected && wsTelemetry 
+    ? Object.fromEntries(
+        Object.entries(wsTelemetry).map(([num, data]) => [
+          parseInt(num), 
+          { 
+            driver_number: parseInt(num), 
+            speed: data.speed, 
+            rpm: data.rpm, 
+            n_gear: data.n_gear, 
+            throttle: data.throttle 
+          }
+        ])
+      )
+    : restTelemetry;
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -230,14 +249,16 @@ export default function PitWallPage() {
         if (data.status === 'Success' && Array.isArray(data.data) && data.data.length > 0) setWeather(data.data[data.data.length - 1]);
       });
 
-      // 3. Telemetry
-      fetch(`${apiUrl}/v1/car_data`).then(r => r.json()).then(telData => {
-        if (telData.status === 'Success' && Array.isArray(telData.data)) {
-          const telMap: Record<number, CarTelemetry> = {};
-          telData.data.forEach((t: CarTelemetry) => { telMap[t.driver_number] = t; });
-          setTelemetry(prev => ({ ...prev, ...telMap }));
-        }
-      });
+      // 3. Telemetry (Only run if WS is not active)
+      if (!wsConnected) {
+        fetch(`${apiUrl}/v1/car_data`).then(r => r.json()).then(telData => {
+          if (telData.status === 'Success' && Array.isArray(telData.data)) {
+            const telMap: Record<number, CarTelemetry> = {};
+            telData.data.forEach((t: CarTelemetry) => { telMap[t.driver_number] = t; });
+            setRestTelemetry(prev => ({ ...prev, ...telMap }));
+          }
+        });
+      }
 
       // 4. Advanced Timing
       Promise.all([
@@ -277,7 +298,7 @@ export default function PitWallPage() {
       if (interval) clearInterval(interval); 
       if (countdownInterval) clearInterval(countdownInterval);
     };
-  }, []);
+  }, [wsConnected]);
 
   const meta = CIRCUITS_METADATA[circuitId] || CIRCUITS_METADATA['villeneuve'];
 
@@ -320,7 +341,7 @@ export default function PitWallPage() {
                        <div className="overflow-x-auto">
                           <table className="w-full text-left">
                              <thead className="bg-steel/50 text-silver/60 text-[8px] md:text-[10px] uppercase font-bold tracking-widest">
-                                <tr><th className="p-3 md:p-4">Pos</th><th className="p-3 md:p-4">Driver</th><th className="p-3 md:p-4">Status</th><th className="p-3 md:p-4 text-right">Points</th></tr>
+                                <tr><th className="p-3 md:p-4">Pos</th><th className="p-3 md:p-4">Driver</th><th className="p-3 md:p-4">Status</th><th className="p-4 text-right">Points</th></tr>
                              </thead>
                              <tbody>
                                 {results.map((r) => (
@@ -369,7 +390,7 @@ export default function PitWallPage() {
 
                     {nextSession && (
                       <div className="bg-f1-red rounded-xl md:rounded-2xl p-6 md:p-8 shadow-[0_0_50px_rgba(255,24,1,0.2)]">
-                         <h4 className="text-[8px] md:text-[10px] font-black text-black uppercase tracking-widest mb-3 md:mb-4">Next Event</h4>
+                         <h4 className="text-[10px] font-black text-black uppercase tracking-widest mb-3 md:mb-4">Next Event</h4>
                          <p className="text-xl md:text-3xl font-black text-black italic uppercase leading-none mb-1 md:mb-2">{nextSession.label}</p>
                          <p className="text-black/60 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-4 md:mb-8">{nextSession.location} — {new Date(nextSession.date).toLocaleDateString([], { month: 'long', day: 'numeric' })}</p>
                          <div className="text-2xl md:text-3xl font-black text-smoke-white tracking-tighter italic tabular-nums">
@@ -397,13 +418,21 @@ export default function PitWallPage() {
               {sessionActive ? 'Live Stream Active' : 'Post-Race Console'}
             </p>
           </div>
-          {weather && (
-            <div className="flex gap-3 md:gap-4 bg-carbon/60 px-2 md:px-3 py-1 md:py-1.5 rounded-lg border border-white/5 backdrop-blur-sm shadow-2xl">
-               <StatItem label="Track" value={`${weather.track_temperature}°C`} />
-               <StatItem label="Air" value={`${weather.air_temperature}°C`} />
-               <StatItem label="Rain" value={weather.rainfall > 0 ? 'YES' : 'NO'} color={weather.rainfall > 0 ? 'text-blue-400' : 'text-f1-red'} />
+          <div className="flex items-center gap-4">
+            {/* Live WebSocket Status */}
+            <div className={`flex items-center gap-2 px-2 py-1 rounded border ${wsConnected ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-white/5 border-white/10 text-silver/40'}`}>
+               <div className={`w-1.5 h-1.5 rounded-full ${wsConnected ? 'bg-green-500 animate-pulse' : 'bg-silver/20'}`}></div>
+               <span className="text-[8px] font-black uppercase tracking-widest">{wsConnected ? `Live Link @ ${lastHz}Hz` : 'Link Offline'}</span>
             </div>
-          )}
+            
+            {weather && (
+              <div className="flex gap-3 md:gap-4 bg-carbon/60 px-2 md:px-3 py-1 md:py-1.5 rounded-lg border border-white/5 backdrop-blur-sm shadow-2xl">
+                 <StatItem label="Track" value={`${weather.track_temperature}°C`} />
+                 <StatItem label="Air" value={`${weather.air_temperature}°C`} />
+                 <StatItem label="Rain" value={weather.rainfall > 0 ? 'YES' : 'NO'} color={weather.rainfall > 0 ? 'text-blue-400' : 'text-f1-red'} />
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 md:gap-4 flex-1 min-h-0">
@@ -473,7 +502,7 @@ export default function PitWallPage() {
 
         <div className="lg:col-span-5 bg-carbon border border-white/5 rounded-xl overflow-hidden shadow-2xl">
           <div className="bg-steel px-3 md:px-4 py-1.5 md:py-2 text-[8px] md:text-[10px] font-bold uppercase tracking-widest text-f1-red">Intercepted Team Radio</div>
-          <div className="p-3 md:p-4 space-y-2.5 md:space-y-3 h-[250px] md:h-[300px] overflow-y-auto custom-scrollbar">{radio.map((r, i) => (<div key={i} className="p-2 md:p-3 bg-white/[0.02] border border-white/5 rounded-lg hover:border-f1-red/40 transition-all group"><div className="flex items-center justify-between mb-1.5 md:mb-2"><div className="flex items-center gap-1.5 md:gap-2"><div className="w-5 md:w-6 h-5 md:h-6 rounded bg-f1-red flex items-center justify-center text-[8px] md:text-[10px] font-black italic shadow-lg shadow-f1-red/20">{r.driver_number}</div><span className="text-[8px] md:text-[9px] font-bold text-f1-red uppercase tracking-tighter">{DRIVER_CODES[r.driver_number] || 'DVR'} UPLINK</span></div><button onClick={() => playRadio(r.recording_url)} className="text-[7px] md:text-[8px] font-black uppercase tracking-widest px-2 md:px-3 py-0.5 md:py-1 bg-f1-red text-smoke-white rounded shadow-xl hover:scale-105 active:scale-95 transition-all">Listen</button></div><div className="flex items-center gap-3 md:gap-4"><div className="h-[1px] md:h-[2px] flex-1 bg-white/5 relative overflow-hidden"><div className="absolute inset-0 bg-f1-red/20 animate-[loading_2s_ease-in-out_infinite]"></div></div><span className="text-[7px] md:text-[8px] text-silver/20 uppercase tabular-nums">{new Date(r.date).toLocaleTimeString()}</span></div></div>))}</div>
+          <div className="p-4 space-y-2.5 md:space-y-3 h-[250px] md:h-[300px] overflow-y-auto custom-scrollbar">{radio.map((r, i) => (<div key={i} className="p-2 md:p-3 bg-white/[0.02] border border-white/5 rounded-lg hover:border-f1-red/40 transition-all group"><div className="flex items-center justify-between mb-1.5 md:mb-2"><div className="flex items-center gap-1.5 md:gap-2"><div className="w-5 md:w-6 h-5 md:h-6 rounded bg-f1-red flex items-center justify-center text-[8px] md:text-[10px] font-black italic shadow-lg shadow-f1-red/20">{r.driver_number}</div><span className="text-[8px] md:text-[9px] font-bold text-f1-red uppercase tracking-tighter">{DRIVER_CODES[r.driver_number] || 'DVR'} UPLINK</span></div><button onClick={() => playRadio(r.recording_url)} className="text-[7px] md:text-[8px] font-black uppercase tracking-widest px-2 md:px-3 py-0.5 md:py-1 bg-f1-red text-smoke-white rounded shadow-xl hover:scale-105 active:scale-95 transition-all">Listen</button></div><div className="flex items-center gap-3 md:gap-4"><div className="h-[1px] md:h-[2px] flex-1 bg-white/5 relative overflow-hidden"><div className="absolute inset-0 bg-f1-red/20 animate-[loading_2s_ease-in-out_infinite]"></div></div><span className="text-[7px] md:text-[8px] text-silver/20 uppercase tabular-nums">{new Date(r.date).toLocaleTimeString()}</span></div></div>))}</div>
         </div>
       </div>
 

@@ -190,6 +190,7 @@ export default function PitWallPage() {
             setLoading(false);
             return;
           }
+          setSessionActive(true);
         }
       } catch (e) {
         console.log("Session check failed");

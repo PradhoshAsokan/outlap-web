@@ -5,11 +5,21 @@ export const runtime = 'edge';
 export async function GET() {
   try {
     const response = await fetch("https://api.jolpi.ca/ergast/f1/2026/driverStandings.json", {
-      next: { revalidate: 3600 } // Standings don't change often, cache for 1 hour
+      headers: {
+        'User-Agent': 'Outlap/1.0 (Next.js Edge Runtime)'
+      },
+      next: { revalidate: 3600 }
     });
+    
+    if (!response.ok) {
+      return NextResponse.json(
+        { status: "Error", message: `Jolpica returned ${response.status}` },
+        { status: response.status }
+      );
+    }
     const data = await response.json();
     return NextResponse.json({ source: "Jolpica API (Internal)", status: "Success", data });
-  } catch (error) {
-    return NextResponse.json({ status: "Error", message: "Failed to fetch standings" }, { status: 500 });
+  } catch (error: any) {
+    return NextResponse.json({ status: "Error", message: error.message || "Failed to fetch standings" }, { status: 500 });
   }
 }
